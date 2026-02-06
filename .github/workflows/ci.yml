@@ -52,14 +52,13 @@ jobs:
       - name: Build
         run: |
           if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
-            # Use zig as the compiler
-            echo "CC=zig cc -target aarch64-linux-musl" >> $GITHUB_ENV
-            echo "AR=zig ar" >> $GITHUB_ENV
-            # Map cargo-specific env vars
-            echo "CC_aarch64_unknown_linux_musl=zig cc -target aarch64-linux-musl" >> $GITHUB_ENV
-            echo "AR_aarch64_unknown_linux_musl=zig ar" >> $GITHUB_ENV
+            # Using zig-cc to simplify environment variable management
+            # and avoid shell splitting issues with "zig cc"
+            sudo cargo install cargo-zigbuild
+            cargo zigbuild --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
           fi
-          cargo build --release --target ${{ matrix.target }}
 
       - name: Run tests
         if: matrix.target == 'x86_64-unknown-linux-musl'
