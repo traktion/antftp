@@ -18,9 +18,7 @@ pub trait ServerExt {
         let address = address.into();
         libunftp::ServerBuilder::new(Box::new(move || {
             let address = address.clone();
-            tokio::runtime::Handle::current().block_on(async move {
-                Anttp::new(address).await.expect("Cannot connect to AntTP")
-            })
+            Anttp::new(address).expect("Cannot connect to AntTP")
         }))
     }
 }

@@ -1,0 +1,216 @@
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/lib.rs:199:pub type AsyncFtpStream = ImplAsyncFtpStream<AsyncNoTlsStream>;
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/sync_ftp/mod.rs:418:    pub fn retr<F, D>(&mut self, file_name: &str, mut reader: F) -> FtpResult<D>
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/sync_ftp/mod.rs:447:    pub fn retr_as_buffer(&mut self, file_name: &str) -> FtpResult<Cursor<Vec<u8>>> {
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/sync_ftp/mod.rs:463:    pub fn retr_as_stream<S: AsRef<str>>(&mut self, file_name: S) -> FtpResult<DataStream<T>> {
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/async_ftp/mod.rs:419:    pub async fn retr<S, F, U>(&mut self, file_name: S, mut reader: F) -> FtpResult<U>
+/home/paul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/suppaftp-6.2.0/src/async_ftp/mod.rs:439:    pub async fn retr_as_stream<S: AsRef<str>>(
+async_ftp   lib.rs   regex.rs   sync_ftp           types.rs
+command.rs  list.rs  status.rs  test_container.rs
+//! # Async
+//!
+//! This module contains the definition for all async implementation of suppaftp
+mod data_stream;
+mod tls;
+use std::future::Future;
+#[cfg(not(feature = "async-secure"))]
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::string::String;
+use std::time::Duration;
+use async_std::io::prelude::BufReadExt;
+use async_std::io::{copy, BufReader, Read, Write};
+use async_std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+// export
+pub use data_stream::DataStream;
+use futures_lite::AsyncWriteExt;
+pub use tls::AsyncNoTlsStream;
+#[cfg(feature = "async-secure")]
+pub use tls::AsyncTlsConnector;
+use tls::AsyncTlsStream;
+#[cfg(feature = "async-native-tls")]
+pub use tls::{AsyncNativeTlsConnector, AsyncNativeTlsStream};
+#[cfg(feature = "async-rustls")]
+pub use tls::{AsyncRustlsConnector, AsyncRustlsStream};
+use super::regex::{EPSV_PORT_RE, MDTM_RE, SIZE_RE};
+use super::types::{FileType, FtpError, FtpResult, Mode, Response};
+use super::Status;
+use crate::command::Command;
+#[cfg(feature = "async-secure")]
+use crate::command::ProtectionLevel;
+use crate::types::Features;
+use crate::FtpStream;
+/// A function that creates a new stream for the data connection in passive mode.
+///
+/// It takes a [`SocketAddr`] and returns a [`TcpStream`].
+pub type PassiveStreamBuilder = dyn Fn(SocketAddr) -> Pin<Box<dyn Future<Output = FtpResult<TcpStream>> + Send + Sync>>
+    + Send
+    + Sync;
+/// Stream to interface with the FTP server. This interface is only for the command stream.
+pub struct ImplAsyncFtpStream<T>
+where
+    T: AsyncTlsStream,
+{
+    reader: BufReader<DataStream<T>>,
+    mode: Mode,
+    nat_workaround: bool,
+    welcome_msg: Option<String>,
+    active_timeout: Duration,
+    passive_stream_builder: Box<PassiveStreamBuilder>,
+    #[cfg(not(feature = "async-secure"))]
+    marker: PhantomData<T>,
+    #[cfg(feature = "async-secure")]
+    tls_ctx: Option<Box<dyn AsyncTlsConnector<Stream = T> + Send + Sync + 'static>>,
+    #[cfg(feature = "async-secure")]
+    domain: Option<String>,
+}
+impl<T> ImplAsyncFtpStream<T>
+where
+    T: AsyncTlsStream,
+{
+    pub async fn connect<A: ToSocketAddrs>(addr: A) -> FtpResult<Self> {
+        debug!("Connecting to server");
+        let stream = TcpStream::connect(addr)
+            .await
+            .map_err(FtpError::ConnectionError)?;
+        debug!("Established connection with server");
+        Self::connect_with_stream(stream).await
+    }
+    /// Try to connect to the remote server but with the specified timeout
+    pub async fn connect_timeout(addr: SocketAddr, timeout: Duration) -> FtpResult<Self> {
+        debug!("Connecting to server {addr}");
+        let stream = async_std::io::timeout(timeout, async move { TcpStream::connect(addr).await })
+            .await
+            .map_err(FtpError::ConnectionError)?;
+        Self::connect_with_stream(stream).await
+    }
+    /// Connect using provided configured tcp stream
+    pub async fn connect_with_stream(stream: TcpStream) -> FtpResult<Self> {
+        debug!("Established connection with server");
+        let mut ftp_stream = ImplAsyncFtpStream {
+            reader: BufReader::new(DataStream::Tcp(stream)),
+            #[cfg(not(feature = "async-secure"))]
+            marker: PhantomData {},
+            mode: Mode::Passive,
+            nat_workaround: false,
+            passive_stream_builder: Self::default_passive_stream_builder(),
+            welcome_msg: None,
+            #[cfg(feature = "async-secure")]
+            tls_ctx: None,
+            #[cfg(feature = "async-secure")]
+            domain: None,
+            active_timeout: Duration::from_secs(60),
+        };
+        debug!("Reading server response...");
+        match ftp_stream.read_response(Status::Ready).await {
+            Ok(response) => {
+                let welcome_msg = response.as_string().ok();
+                debug!("Server READY; response: {:?}", welcome_msg);
+                ftp_stream.welcome_msg = welcome_msg;
+                Ok(ftp_stream)
+            }
+            Err(err) => Err(err),
+        }
+    }
+    /// Switch to secure mode if possible (FTPS), using a provided SSL configuration.
+    /// This method does nothing if the connect is already secured.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// use suppaftp::ImplAsyncFtpStream;
+    /// use suppaftp::async_native_tls::{TlsConnector, TlsStream};
+    /// use std::path::Path;
+    ///
+    /// // Create a TlsConnector
+    /// // NOTE: For custom options see <https://docs.rs/native-tls/0.2.6/native_tls/struct.TlsConnectorBuilder.html>
+    /// let mut ctx = TlsConnector::new();
+    /// let mut ftp_stream = ImplAsyncFtpStream::connect("127.0.0.1:21").await.unwrap();
+    /// let mut ftp_stream = ftp_stream.into_secure(ctx, "localhost").await.unwrap();
+    /// ```
+    #[cfg(feature = "async-secure")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "async-secure")))]
+    pub async fn into_secure(
+        mut self,
+        tls_connector: impl AsyncTlsConnector<Stream = T> + Send + Sync + 'static,
+        domain: &str,
+    ) -> FtpResult<Self> {
+        debug!("Initializing TLS auth");
+        // Ask the server to start securing data.
+        self.perform(Command::Auth).await?;
+        self.read_response(Status::AuthOk).await?;
+        debug!("TLS OK; initializing ssl stream");
+        let stream = tls_connector
+            .connect(
+                domain,
+                self.reader.into_inner().into_tcp_stream().to_owned(),
+            )
+            .await
+            .map_err(|e| FtpError::SecureError(format!("{e}")))?;
+        let mut secured_ftp_tream = ImplAsyncFtpStream {
+            reader: BufReader::new(DataStream::Ssl(Box::new(stream))),
+            mode: self.mode,
+            nat_workaround: self.nat_workaround,
+            passive_stream_builder: self.passive_stream_builder,
+            tls_ctx: Some(Box::new(tls_connector)),
+            domain: Some(String::from(domain)),
+            welcome_msg: self.welcome_msg,
+            active_timeout: self.active_timeout,
+        };
+        // Set protection buffer size
+        secured_ftp_tream.perform(Command::Pbsz(0)).await?;
+        secured_ftp_tream.read_response(Status::CommandOk).await?;
+        // Change the level of data protectio to Private
+        secured_ftp_tream
+            .perform(Command::Prot(ProtectionLevel::Private))
+            .await?;
+        secured_ftp_tream.read_response(Status::CommandOk).await?;
+        Ok(secured_ftp_tream)
+    }
+    /// Connect to remote ftps server using IMPLICIT secure connection.
+    ///
+    /// > Warning: mind that implicit ftps should be considered deprecated, if you can use explicit mode with `into_secure()`
+    ///
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// use suppaftp::ImplAsyncFtpStream;
+    /// use suppaftp::native_tls::{TlsConnector, TlsStream};
+    /// use std::path::Path;
+    ///
+    /// // Create a TlsConnector
+    /// // NOTE: For custom options see <https://docs.rs/native-tls/0.2.6/native_tls/struct.TlsConnectorBuilder.html>
+    /// let mut ctx = TlsConnector::new();
+    /// let mut ftp_stream = ImplAsyncFtpStream::connect_secure_implicit("127.0.0.1:990", ctx, "localhost").await.unwrap();
+    /// ```
+    #[cfg(all(feature = "async-secure", feature = "deprecated"))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "async-secure", feature = "deprecated")))
+    )]
+    pub async fn connect_secure_implicit<A: ToSocketAddrs>(
+        addr: A,
+        tls_connector: impl AsyncTlsConnector<Stream = T> + Send + Sync + 'static,
+        domain: &str,
+    ) -> FtpResult<Self> {
+        debug!("Connecting to server (secure)");
+        let stream = TcpStream::connect(addr)
+            .await
+            .map_err(FtpError::ConnectionError)
+            .map(|stream| {
+                debug!("Established connection with server");
+                Self {
+                    reader: BufReader::new(DataStream::Tcp(stream)),
+                    mode: Mode::Passive,
+                    nat_workaround: false,
+                    welcome_msg: None,
+                    passive_stream_builder: Self::default_passive_stream_builder(),
+                    tls_ctx: None,
+                    domain: None,
+                    active_timeout: Duration::from_secs(60),
+                }
+            })?;
+        debug!("Established connection with server");
+        debug!("TLS OK; initializing ssl stream");
