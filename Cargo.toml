@@ -10,9 +10,13 @@ tokio = { version = "1", features = ["full"] }
 unftp-sbe-anttp = { version = "0.1.0", path = "crates/unftp-sbe-anttp" }
 tonic = { version = "0.12", features = ["router"] }
 prost = { version = "0.13"}
+clap = { version = "4.5.57", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = { version = "0.12" }
 
 [dev-dependencies]
 unftp-sbe-anttp = { path = "crates/unftp-sbe-anttp" }
+suppaftp = { version = "6.2.0", features = ["async"] }
+tokio-stream = "0.1"
+async-std = { version = "1.13", features = ["attributes"] }
