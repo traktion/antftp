@@ -59,7 +59,8 @@ jobs:
         run: |
           if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
             # Using cargo-zigbuild for reliable cross-compilation
-            sudo cargo install cargo-zigbuild
+            # We install it without sudo to avoid permission issues and speed up
+            cargo install cargo-zigbuild
             cargo zigbuild --release --target ${{ matrix.target }}
           else
             cargo build --release --target ${{ matrix.target }}
