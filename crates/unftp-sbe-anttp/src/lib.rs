@@ -191,7 +191,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_anttp_new() {
-        // This will fail because no server is running, but it checks if it can at least try to connect
-        let _ = Anttp::new("test_address".to_string()).await;
+        // Just verify it doesn't panic during construction if possible,
+        // though it currently tries to connect immediately.
+        // We use a dummy address.
+        let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
+        let _ = Anttp::new(addr).await;
     }
 }
