@@ -1,0 +1,7 @@
+Issue #1: Replace skeleton unftp-sbe-anttp code with an AntTP protobuf integration
+
+Implementation Notes:
+- connect to anttp at localhost:18887
+- directory listing is done via the `items` field in GetPublicArchive
+- file retrieval is done via the `content` field in GetPublicArchive
+- other storage backend methods are stubbed

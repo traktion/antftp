@@ -1,11 +1,10 @@
-use crate::Filesystem;
+use crate::Anttp;
 use libunftp::auth::DefaultUser;
 use libunftp::{Server, ServerBuilder};
-use std::path::PathBuf;
 
 /// Extension trait purely for construction convenience.
 pub trait ServerExt {
-    /// Create a new `Server` with the given Autonomi archive root pointer address.
+    /// Create a new `Server` with the given AntTP address.
     ///
     /// # Example
     ///
@@ -13,18 +12,17 @@ pub trait ServerExt {
     /// use libunftp::Server;
     /// use unftp_sbe_anttp::ServerExt;
     ///
-    /// let server = Server::with_anttp("<address>");
+    /// let server = Server::with_anttp("some_address");
     /// ```
-    fn with_anttp<P: Into<PathBuf> + Send + 'static>(path: P) -> ServerBuilder<Filesystem, DefaultUser> {
-        let p = path.into();
+    fn with_anttp(address: impl Into<String>) -> ServerBuilder<Anttp, DefaultUser> {
+        let address = address.into();
         libunftp::ServerBuilder::new(Box::new(move || {
-            let p = &p.clone();
-            match Filesystem::new(p) {
-                Ok(fs) => fs,
-                Err(e) => panic!("Cannot open file system root {}: {}", p.display(), e),
-            }
+            let address = address.clone();
+            tokio::runtime::Handle::current().block_on(async move {
+                Anttp::new(address).await.expect("Cannot connect to AntTP")
+            })
         }))
     }
 }
 
-impl ServerExt for Server<Filesystem, DefaultUser> {}
+impl ServerExt for Server<Anttp, DefaultUser> {}
