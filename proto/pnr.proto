@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package pnr;
+
+service PnrService {
+  rpc CreatePnr(CreatePnrRequest) returns (PnrResponse);
+  rpc UpdatePnr(UpdatePnrRequest) returns (PnrResponse);
+  rpc GetPnr(GetPnrRequest) returns (PnrResponse);
+}
+
+message PnrZone {
+  string name = 1;
+  map<string, PnrRecord> records = 2;
+  optional string resolver_address = 3;
+  optional string personal_address = 4;
+}
+
+message PnrRecord {
+  string address = 2;
+  PnrRecordType record_type = 3;
+  uint64 ttl = 4;
+}
+
+enum PnrRecordType {
+  A = 0;
+  X = 1;
+}
+
+message CreatePnrRequest {
+  PnrZone pnr_zone = 1;
+  optional string store_type = 2;
+}
+
+message UpdatePnrRequest {
+  string name = 1;
+  PnrZone pnr_zone = 2;
+  optional string store_type = 3;
+}
+
+message GetPnrRequest {
+  string name = 1;
+}
+
+message PnrResponse {
+  PnrZone pnr_zone = 1;
+}
