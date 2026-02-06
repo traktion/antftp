@@ -16,12 +16,13 @@ pub use ext::ServerExt;
 #[derive(Debug, Clone)]
 pub struct Anttp {
     client: PublicArchiveServiceClient<Channel>,
+    address: String,
 }
 
 impl Anttp {
-    pub async fn new() -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let client = PublicArchiveServiceClient::connect("http://localhost:18887").await?;
-        Ok(Anttp { client })
+        Ok(Anttp { client, address })
     }
 }
 
@@ -43,7 +44,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: String::new(), // Default address or handled by server
+            address: self.address.clone(),
             path: path_str,
             store_type: None,
         });
@@ -66,7 +67,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: String::new(),
+            address: self.address.clone(),
             path: path_str,
             store_type: None,
         });
@@ -97,7 +98,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: String::new(),
+            address: self.address.clone(),
             path: path_str,
             store_type: None,
         });
@@ -191,6 +192,6 @@ mod tests {
     #[tokio::test]
     async fn test_anttp_new() {
         // This will fail because no server is running, but it checks if it can at least try to connect
-        let _ = Anttp::new().await;
+        let _ = Anttp::new("test_address".to_string()).await;
     }
 }

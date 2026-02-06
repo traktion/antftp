@@ -8,5 +8,5 @@ pub async fn main() {
         .build()
         .unwrap();
 
-    server.listen("127.0.0.1:2121").await;
+    server.listen("127.0.0.1:2121").await.expect("Failed to start FTP listener");
 }

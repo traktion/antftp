@@ -12,12 +12,14 @@ pub trait ServerExt {
     /// use libunftp::Server;
     /// use unftp_sbe_anttp::ServerExt;
     ///
-    /// let server = Server::with_anttp();
+    /// let server = Server::with_anttp("some_address");
     /// ```
-    fn with_anttp() -> ServerBuilder<Anttp, DefaultUser> {
+    fn with_anttp(address: impl Into<String>) -> ServerBuilder<Anttp, DefaultUser> {
+        let address = address.into();
         libunftp::ServerBuilder::new(Box::new(move || {
-            tokio::runtime::Handle::current().block_on(async {
-                Anttp::new().await.expect("Cannot connect to AntTP")
+            let address = address.clone();
+            tokio::runtime::Handle::current().block_on(async move {
+                Anttp::new(address).await.expect("Cannot connect to AntTP")
             })
         }))
     }
