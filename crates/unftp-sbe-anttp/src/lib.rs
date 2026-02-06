@@ -1,4 +1,4 @@
-mod proto;
+pub mod proto;
 
 use crate::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
 use crate::proto::public_archive::{GetPublicArchiveRequest};
@@ -17,12 +17,16 @@ pub use ext::ServerExt;
 pub struct Anttp {
     client: PublicArchiveServiceClient<Channel>,
     address: String,
+    store_type: Option<String>,
 }
 
 impl Anttp {
-    pub async fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let client = PublicArchiveServiceClient::connect("http://localhost:18887").await?;
-        Ok(Anttp { client, address })
+    pub fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
+        let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
+        let client = PublicArchiveServiceClient::new(channel);
+        let store_type = Some("memory".to_string());
+        Ok(Anttp { client, address, store_type })
     }
 }
 
@@ -46,7 +50,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let request = tonic::Request::new(GetPublicArchiveRequest {
             address: self.address.clone(),
             path: path_str,
-            store_type: None,
+            store_type: self.store_type.clone(),
         });
 
         let response = client.get_public_archive(request).await
@@ -69,7 +73,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let request = tonic::Request::new(GetPublicArchiveRequest {
             address: self.address.clone(),
             path: path_str,
-            store_type: None,
+            store_type: self.store_type.clone(),
         });
 
         let response = client.get_public_archive(request).await
@@ -100,7 +104,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let request = tonic::Request::new(GetPublicArchiveRequest {
             address: self.address.clone(),
             path: path_str,
-            store_type: None,
+            store_type: self.store_type.clone(),
         });
 
         let response = client.get_public_archive(request).await
