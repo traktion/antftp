@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-libunftp = "0.21.1"
+libunftp = { version = "0.21.1", default-features = false }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "tls12", "std"] }
 tokio = { version = "1", features = ["full"] }
 unftp-sbe-anttp = { version = "0.1.0", path = "crates/unftp-sbe-anttp" }
 tonic = { version = "0.12", features = ["router"] }

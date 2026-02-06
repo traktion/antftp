@@ -84,6 +84,7 @@ dependencies = [
  "clap",
  "libunftp",
  "prost",
+ "rustls",
  "suppaftp",
  "tokio",
  "tokio-stream",
@@ -1810,6 +1811,7 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
@@ -2321,7 +2323,7 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "unftp-sbe-anttp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "cap-std",
