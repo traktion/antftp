@@ -52,8 +52,12 @@ jobs:
       - name: Build
         run: |
           if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
-            export CC_aarch64_unknown_linux_musl="$ZIG_CC"
-            export AR_aarch64_unknown_linux_musl="$ZIG_AR"
+            # Use zig as the compiler
+            echo "CC=zig cc -target aarch64-linux-musl" >> $GITHUB_ENV
+            echo "AR=zig ar" >> $GITHUB_ENV
+            # Map cargo-specific env vars
+            echo "CC_aarch64_unknown_linux_musl=zig cc -target aarch64-linux-musl" >> $GITHUB_ENV
+            echo "AR_aarch64_unknown_linux_musl=zig ar" >> $GITHUB_ENV
           fi
           cargo build --release --target ${{ matrix.target }}
 
