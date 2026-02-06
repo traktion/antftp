@@ -53,8 +53,8 @@ jobs:
       - name: Build
         run: |
           if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
-            export CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc
-            export AR_aarch64_unknown_linux_musl=aarch64-linux-musl-ar
+            export CC_aarch64_unknown_linux_musl=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc
+            export AR_aarch64_unknown_linux_musl=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-ar
           fi
           cargo build --release --target ${{ matrix.target }}
 
