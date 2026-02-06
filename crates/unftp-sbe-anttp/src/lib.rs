@@ -1,13 +1,16 @@
 pub mod proto;
 
 use crate::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
-use crate::proto::public_archive::{GetPublicArchiveRequest};
+use crate::proto::public_archive::{GetPublicArchiveRequest, UpdatePublicArchiveRequest, File};
 use async_trait::async_trait;
 use libunftp::auth::UserDetail;
 use libunftp::storage::{Fileinfo, Metadata, Permissions, Result, StorageBackend, Error, ErrorKind};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::io::AsyncReadExt;
+use tokio::sync::RwLock;
 use tonic::transport::Channel;
 
 pub mod ext;
@@ -16,7 +19,7 @@ pub use ext::ServerExt;
 #[derive(Debug, Clone)]
 pub struct Anttp {
     client: PublicArchiveServiceClient<Channel>,
-    address: String,
+    address: Arc<RwLock<String>>,
     store_type: Option<String>,
 }
 
@@ -26,7 +29,11 @@ impl Anttp {
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
         let client = PublicArchiveServiceClient::new(channel);
         let store_type = Some("memory".to_string());
-        Ok(Anttp { client, address, store_type })
+        Ok(Anttp {
+            client,
+            address: Arc::new(RwLock::new(address)),
+            store_type,
+        })
     }
 }
 
@@ -48,8 +55,9 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     async fn metadata<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<Self::Metadata> {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
+        let address = self.address.read().await.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: self.address.clone(),
+            address,
             path: path_str,
             store_type: self.store_type.clone(),
         });
@@ -72,8 +80,9 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
+        let address = self.address.read().await.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: self.address.clone(),
+            address,
             path: path_str,
             store_type: self.store_type.clone(),
         });
@@ -101,8 +110,9 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     async fn get<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P, _start_pos: u64) -> Result<Box<dyn tokio::io::AsyncRead + Send + Sync + Unpin>> {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
+        let address = self.address.read().await.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
-            address: self.address.clone(),
+            address,
             path: path_str,
             store_type: self.store_type.clone(),
         });
@@ -119,11 +129,37 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     async fn put<P: AsRef<Path> + Send, R: tokio::io::AsyncRead + Send + Sync + 'static + Unpin>(
         &self,
         _user: &User,
-        _bytes: R,
-        _path: P,
+        mut bytes: R,
+        path: P,
         _start_pos: u64,
     ) -> Result<u64> {
-        Err(Error::from(ErrorKind::CommandNotImplemented))
+        let mut content = Vec::new();
+        bytes.read_to_end(&mut content).await
+            .map_err(|e| Error::new(ErrorKind::LocalError, e))?;
+        let len = content.len() as u64;
+
+        let path_str = path.as_ref().to_string_lossy().into_owned();
+        let mut client = self.client.clone();
+        
+        let mut address_guard = self.address.write().await;
+        let request = tonic::Request::new(UpdatePublicArchiveRequest {
+            address: address_guard.clone(),
+            files: vec![File {
+                name: path_str,
+                content,
+                target_path: None,
+            }],
+            store_type: self.store_type.clone(),
+        });
+
+        let response = client.update_public_archive(request).await
+            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+
+        if let Some(new_address) = response.into_inner().address {
+            *address_guard = new_address;
+        }
+
+        Ok(len)
     }
 
     async fn del<P: AsRef<Path> + Send + Debug>(&self, _user: &User, _path: P) -> Result<()> {
@@ -134,8 +170,32 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         Err(Error::from(ErrorKind::CommandNotImplemented))
     }
 
-    async fn mkd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, _path: P) -> Result<()> {
-        Err(Error::from(ErrorKind::CommandNotImplemented))
+    async fn mkd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
+        let mut path_buf = path.as_ref().to_path_buf();
+        path_buf.push(".metadata");
+        let path_str = path_buf.to_string_lossy().into_owned();
+        
+        let mut client = self.client.clone();
+        let mut address_guard = self.address.write().await;
+        
+        let request = tonic::Request::new(UpdatePublicArchiveRequest {
+            address: address_guard.clone(),
+            files: vec![File {
+                name: path_str,
+                content: Vec::new(),
+                target_path: None,
+            }],
+            store_type: self.store_type.clone(),
+        });
+
+        let response = client.update_public_archive(request).await
+            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+        
+        if let Some(new_address) = response.into_inner().address {
+            *address_guard = new_address;
+        }
+
+        Ok(())
     }
 
     async fn rename<P: AsRef<Path> + Send + Debug>(&self, _user: &User, _from: P, _to: P) -> Result<()> {
@@ -219,9 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_del_not_implemented() {
-        // Since we are asked to update tests to reflect new DEL command,
-        // and it is currently not implemented, we verify it returns CommandNotImplemented.
-        // We need a dummy Anttp instance.
+        // DEL is currently not implemented, we verify it returns CommandNotImplemented.
         let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
         let anttp = Anttp::new(addr).unwrap();
         let user = libunftp::auth::DefaultUser {};
