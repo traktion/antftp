@@ -26,6 +26,12 @@ impl PublicArchiveService for MockArchiveService {
         request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
     ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
         let req = request.into_inner();
+        
+        // Basic validation of the new proto structure
+        if req.path.is_none() {
+            return Err(Status::invalid_argument("path is required in the new proto"));
+        }
+
         let mut new_address = req.address;
         new_address.push_str("_updated");
         Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {

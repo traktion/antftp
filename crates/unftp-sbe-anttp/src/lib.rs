@@ -145,10 +145,10 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let request = tonic::Request::new(UpdatePublicArchiveRequest {
             address: address_guard.clone(),
             files: vec![File {
-                name: path_str,
+                name: "".to_string(),
                 content,
-                target_path: None,
             }],
+            path: Some(path_str),
             store_type: self.store_type.clone(),
         });
 
@@ -171,9 +171,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn mkd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
-        let mut path_buf = path.as_ref().to_path_buf();
-        path_buf.push(".metadata");
-        let path_str = path_buf.to_string_lossy().into_owned();
+        let path_str = path.as_ref().to_string_lossy().into_owned();
         
         let mut client = self.client.clone();
         let mut address_guard = self.address.write().await;
@@ -181,10 +179,10 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let request = tonic::Request::new(UpdatePublicArchiveRequest {
             address: address_guard.clone(),
             files: vec![File {
-                name: path_str,
+                name: ".metadata".to_string(),
                 content: Vec::new(),
-                target_path: None,
             }],
+            path: Some(path_str),
             store_type: self.store_type.clone(),
         });
 
