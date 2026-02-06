@@ -138,14 +138,16 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             .map_err(|e| Error::new(ErrorKind::LocalError, e))?;
         let len = content.len() as u64;
 
-        let path_str = path.as_ref().to_string_lossy().into_owned();
+        let path_ref = path.as_ref();
+        let path_str = path_ref.to_string_lossy().into_owned();
+        let filename = path_ref.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let mut client = self.client.clone();
         
         let mut address_guard = self.address.write().await;
         let request = tonic::Request::new(UpdatePublicArchiveRequest {
             address: address_guard.clone(),
             files: vec![File {
-                name: "".to_string(),
+                name: filename,
                 content,
             }],
             path: Some(path_str),

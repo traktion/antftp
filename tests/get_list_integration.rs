@@ -32,6 +32,14 @@ impl PublicArchiveService for MockArchiveService {
             return Err(Status::invalid_argument("path is required in the new proto"));
         }
 
+        let path = req.path.as_ref().unwrap();
+        if path.ends_with("new_file.txt") {
+            let file = &req.files[0];
+            if file.name != "new_file.txt" {
+                return Err(Status::invalid_argument(format!("Expected filename 'new_file.txt', got '{}'", file.name)));
+            }
+        }
+
         let mut new_address = req.address;
         new_address.push_str("_updated");
         Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
