@@ -49,11 +49,16 @@ jobs:
             echo "ZIG_AR=zig ar" >> $GITHUB_ENV
           fi
 
+      - name: Setup Zig
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          zig-version: 0.12.0
+
       - name: Build
         run: |
           if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-musl" ]]; then
-            # Using zig-cc to simplify environment variable management
-            # and avoid shell splitting issues with "zig cc"
+            # Using cargo-zigbuild for reliable cross-compilation
             sudo cargo install cargo-zigbuild
             cargo zigbuild --release --target ${{ matrix.target }}
           else
