@@ -23,9 +23,14 @@ impl PublicArchiveService for MockArchiveService {
 
     async fn update_public_archive(
         &self,
-        _request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
+        request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
     ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
-        Err(Status::unimplemented("not needed for this test"))
+        let req = request.into_inner();
+        let mut new_address = req.address;
+        new_address.push_str("_updated");
+        Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
+            address: Some(new_address),
+        }))
     }
 
     async fn truncate_public_archive(
@@ -147,6 +152,43 @@ async fn integration_list_and_get() {
     stream.read_to_end(&mut data).await.expect("read_to_end");
     ftp_stream.finalize_retr_stream(stream).await.expect("finalize_retr_stream");
     assert_eq!(data, b"hello world");
+
+    ftp_stream.quit().await.ok();
+}
+
+#[tokio::test]
+async fn integration_put_and_mkd() {
+    // 1) Start mock gRPC
+    let (grpc_endpoint, _grpc_handle) = start_mock_grpc().await;
+    unsafe { std::env::set_var("ANTTP_GRPC_ENDPOINT", &grpc_endpoint); }
+
+    // 2) Pick random FTP port
+    let ftp_listener = TcpListener::bind("127.0.0.1:0").expect("bind ftp");
+    let ftp_addr = ftp_listener.local_addr().unwrap();
+    drop(ftp_listener); // release so libunftp can bind
+    let ftp_addr_str = format!("{}:{}", ftp_addr.ip(), ftp_addr.port());
+
+    // 3) Start FTP server
+    let initial_address = "cec7a9eb2c644b9a5de58bbcdf2e893db9f0b2acd7fc563fc849e19d1f6bd872";
+    let _ftp_handle = start_ftp_server(
+        initial_address,
+        &ftp_addr_str,
+    );
+
+    // 4) Give server a moment to start
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // 5) Connect with suppaftp
+    let mut ftp_stream = AsyncFtpStream::connect(&ftp_addr_str).await.expect("connect ftp");
+    ftp_stream.login("anonymous", "anonymous").await.expect("login");
+
+    // 6) Test MKD
+    ftp_stream.mkdir("new_dir").await.expect("mkdir");
+    
+    // 7) Test PUT
+    let content = b"new file content";
+    let mut reader = content.as_slice();
+    ftp_stream.put_file("new_file.txt", &mut reader).await.expect("put_file");
 
     ftp_stream.quit().await.ok();
 }
