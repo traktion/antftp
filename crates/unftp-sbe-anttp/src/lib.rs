@@ -34,6 +34,7 @@ impl Anttp {
 pub struct Meta {
     len: u64,
     is_dir: bool,
+    modified: Option<SystemTime>,
 }
 
 #[async_trait]
@@ -61,6 +62,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         Ok(Meta {
             len: inner.content.as_ref().map(|c| c.len() as u64).unwrap_or(0),
             is_dir: !inner.items.is_empty(),
+            modified: None, // GetPublicArchiveResponse doesn't have a top-level modified date yet
         })
     }
 
@@ -82,15 +84,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let inner = response.into_inner();
         let mut fis = Vec::new();
         for item in inner.items {
-            let item_path = PathBuf::from(&item);
-            // We don't have full metadata for each item in the list response, 
-            // so we might need to fetch it or use defaults.
-            // For now, let's assume if it's in the list, it's a file/dir.
+            let item_path = PathBuf::from(&item.name);
             fis.push(Fileinfo {
                 path: item_path,
                 metadata: Meta {
-                    len: 0, 
-                    is_dir: false, // Need more info from AntTP if we want to distinguish here
+                    len: item.size, 
+                    is_dir: item.r#type == "directory",
+                    modified: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(item.modified)),
                 },
             });
         }
@@ -165,7 +165,8 @@ impl Metadata for Meta {
     }
 
     fn modified(&self) -> Result<SystemTime> {
-        Ok(SystemTime::now())
+        self.modified.ok_or_else(|| Error::from(ErrorKind::PermanentFileNotAvailable))
+            .or_else(|_| Ok(SystemTime::now()))
     }
 
     fn gid(&self) -> u32 {
@@ -199,6 +200,35 @@ mod tests {
         // though it currently tries to connect immediately.
         // We use a dummy address.
         let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
-        let _ = Anttp::new(addr).await;
+        let _ = Anttp::new(addr);
+    }
+
+    #[tokio::test]
+    async fn test_meta_new() {
+        let now = SystemTime::now();
+        let meta = Meta {
+            len: 100,
+            is_dir: true,
+            modified: Some(now),
+        };
+        assert_eq!(meta.len(), 100);
+        assert!(meta.is_dir());
+        assert!(!meta.is_file());
+        assert_eq!(meta.modified().unwrap(), now);
+    }
+
+    #[tokio::test]
+    async fn test_del_not_implemented() {
+        // Since we are asked to update tests to reflect new DEL command,
+        // and it is currently not implemented, we verify it returns CommandNotImplemented.
+        // We need a dummy Anttp instance.
+        let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
+        let anttp = Anttp::new(addr).unwrap();
+        let user = libunftp::auth::DefaultUser {};
+        let result: Result<()> = anttp.del(&user, "some/path").await;
+        match result {
+            Err(e) => assert_eq!(e.kind(), ErrorKind::CommandNotImplemented),
+            _ => panic!("Expected CommandNotImplemented"),
+        }
     }
 }

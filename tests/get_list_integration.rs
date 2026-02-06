@@ -7,7 +7,7 @@ use unftp_sbe_anttp::ServerExt;
 
 // Generated from proto (provided by unftp-sbe-anttp crate)
 use unftp_sbe_anttp::proto::public_archive::public_archive_service_server::{PublicArchiveService, PublicArchiveServiceServer};
-use unftp_sbe_anttp::proto::public_archive::{GetPublicArchiveRequest, GetPublicArchiveResponse};
+use unftp_sbe_anttp::proto::public_archive::{GetPublicArchiveRequest, GetPublicArchiveResponse, Item};
 use tonic::{Request, Response, Status};
 
 struct MockArchiveService;
@@ -44,7 +44,20 @@ impl PublicArchiveService for MockArchiveService {
         if req.path.is_empty() || req.path == "/" {
             Ok(Response::new(GetPublicArchiveResponse {
                 address: Some(req.address.clone()),
-                items: vec!["file1.txt".to_string(), "dir".to_string()],
+                items: vec![
+                    Item {
+                        name: "file1.txt".to_string(),
+                        size: 11,
+                        modified: 0,
+                        r#type: "file".to_string(),
+                    },
+                    Item {
+                        name: "dir".to_string(),
+                        size: 0,
+                        modified: 0,
+                        r#type: "directory".to_string(),
+                    },
+                ],
                 content: None,
             }))
         } else if req.path == "/file1.txt" || req.path == "file1.txt" {
@@ -125,7 +138,7 @@ async fn integration_list_and_get() {
 
     // 6) List root
     let list = ftp_stream.nlst(None).await.expect("nlst");
-    assert!(list.contains(&"file1.txt".to_string()));
+    assert!(list.iter().any(|item| item == "file1.txt"));
 
     // 7) Retrieve file
     let mut stream = ftp_stream.retr_as_stream("file1.txt").await.expect("retr_as_stream");
