@@ -1,0 +1,17 @@
+[package]
+name = "antftp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libunftp = "0.21.1"
+tokio = { version = "1", features = ["full"] }
+unftp-sbe-anttp = { version = "0.1.0", path = "crates/unftp-sbe-anttp" }
+tonic = { version = "0.12", features = ["router"] }
+prost = { version = "0.13"}
+
+[build-dependencies]
+tonic-build = { version = "0.12" }
+
+[dev-dependencies]
+unftp-sbe-anttp = { path = "crates/unftp-sbe-anttp" }
