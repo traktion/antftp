@@ -26,6 +26,20 @@ impl PublicArchiveService for MockArchiveService {
         request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
     ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
         let req = request.into_inner();
+        
+        // Basic validation of the new proto structure
+        if req.path.is_none() {
+            return Err(Status::invalid_argument("path is required in the new proto"));
+        }
+
+        let path = req.path.as_ref().unwrap();
+        if path.ends_with("new_file.txt") {
+            let file = &req.files[0];
+            if file.name != "new_file.txt" {
+                return Err(Status::invalid_argument(format!("Expected filename 'new_file.txt', got '{}'", file.name)));
+            }
+        }
+
         let mut new_address = req.address;
         new_address.push_str("_updated");
         Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
@@ -134,14 +148,14 @@ async fn integration_list_and_get() {
     );
 
     // 4) Give server a moment to start
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // 5) Connect with suppaftp
     let addr = format!("{}:{}", ftp_addr.ip(), ftp_addr.port());
     let mut ftp_stream = AsyncFtpStream::connect(addr).await.expect("connect ftp");
     ftp_stream.login("anonymous", "anonymous").await.expect("login");
 
-    // 6) List root
+    // Root listing
     let list = ftp_stream.nlst(None).await.expect("nlst");
     assert!(list.iter().any(|item| item == "file1.txt"));
 
@@ -176,7 +190,7 @@ async fn integration_put_and_mkd() {
     );
 
     // 4) Give server a moment to start
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // 5) Connect with suppaftp
     let mut ftp_stream = AsyncFtpStream::connect(&ftp_addr_str).await.expect("connect ftp");
