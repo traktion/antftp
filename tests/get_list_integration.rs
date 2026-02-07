@@ -148,14 +148,14 @@ async fn integration_list_and_get() {
     );
 
     // 4) Give server a moment to start
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // 5) Connect with suppaftp
     let addr = format!("{}:{}", ftp_addr.ip(), ftp_addr.port());
     let mut ftp_stream = AsyncFtpStream::connect(addr).await.expect("connect ftp");
     ftp_stream.login("anonymous", "anonymous").await.expect("login");
 
-    // 6) List root
+    // Root listing
     let list = ftp_stream.nlst(None).await.expect("nlst");
     assert!(list.iter().any(|item| item == "file1.txt"));
 
@@ -190,7 +190,7 @@ async fn integration_put_and_mkd() {
     );
 
     // 4) Give server a moment to start
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // 5) Connect with suppaftp
     let mut ftp_stream = AsyncFtpStream::connect(&ftp_addr_str).await.expect("connect ftp");
