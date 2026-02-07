@@ -1,7 +1,7 @@
 pub mod proto;
 
 use crate::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
-use crate::proto::public_archive::{GetPublicArchiveRequest, UpdatePublicArchiveRequest, File};
+use crate::proto::public_archive::{GetPublicArchiveRequest, UpdatePublicArchiveRequest, TruncatePublicArchiveRequest, File};
 use async_trait::async_trait;
 use libunftp::auth::UserDetail;
 use libunftp::storage::{Fileinfo, Metadata, Permissions, Result, StorageBackend, Error, ErrorKind};
@@ -53,7 +53,10 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn metadata<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<Self::Metadata> {
-        let path_str = path.as_ref().to_string_lossy().into_owned();
+        let mut path_str = path.as_ref().to_string_lossy().into_owned();
+        if path_str == "." {
+            path_str = "".to_string();
+        }
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
         let request = tonic::Request::new(GetPublicArchiveRequest {
@@ -62,8 +65,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await
-            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+        let response = client.get_public_archive(request).await.map_err(|e| {
+            if e.code() == tonic::Code::NotFound {
+                Error::from(ErrorKind::PermanentFileNotAvailable)
+            } else {
+                Error::new(ErrorKind::PermanentFileNotAvailable, e)
+            }
+        })?;
         
         let inner = response.into_inner();
         
@@ -87,8 +95,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await
-            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+        let response = client.get_public_archive(request).await.map_err(|e| {
+            if e.code() == tonic::Code::NotFound {
+                Error::from(ErrorKind::PermanentFileNotAvailable)
+            } else {
+                Error::new(ErrorKind::PermanentFileNotAvailable, e)
+            }
+        })?;
         
         let inner = response.into_inner();
         let mut fis = Vec::new();
@@ -117,8 +130,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await
-            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+        let response = client.get_public_archive(request).await.map_err(|e| {
+            if e.code() == tonic::Code::NotFound {
+                Error::from(ErrorKind::PermanentFileNotAvailable)
+            } else {
+                Error::new(ErrorKind::PermanentFileNotAvailable, e)
+            }
+        })?;
         
         let inner = response.into_inner();
         let content = inner.content.ok_or_else(|| Error::from(ErrorKind::PermanentFileNotAvailable))?;
@@ -164,12 +182,29 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         Ok(len)
     }
 
-    async fn del<P: AsRef<Path> + Send + Debug>(&self, _user: &User, _path: P) -> Result<()> {
-        Err(Error::from(ErrorKind::CommandNotImplemented))
+    async fn del<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
+        let path_str = path.as_ref().to_string_lossy().into_owned();
+        let mut client = self.client.clone();
+        let mut address_guard = self.address.write().await;
+
+        let request = tonic::Request::new(TruncatePublicArchiveRequest {
+            address: address_guard.clone(),
+            path: path_str,
+            store_type: self.store_type.clone(),
+        });
+
+        let response = client.truncate_public_archive(request).await
+            .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
+
+        if let Some(new_address) = response.into_inner().address {
+            *address_guard = new_address;
+        }
+
+        Ok(())
     }
 
-    async fn rmd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, _path: P) -> Result<()> {
-        Err(Error::from(ErrorKind::CommandNotImplemented))
+    async fn rmd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
+        self.del(_user, path).await
     }
 
     async fn mkd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
@@ -278,15 +313,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_del_not_implemented() {
-        // DEL is currently not implemented, we verify it returns CommandNotImplemented.
+    async fn test_del_implemented() {
         let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
         let anttp = Anttp::new(addr).unwrap();
         let user = libunftp::auth::DefaultUser {};
+        // This will try to connect to the real server (or fail if it's not running)
+        // Since we don't have a mock server in unit tests, it's likely to return an error.
+        // But the error should be from gRPC, not CommandNotImplemented.
         let result: Result<()> = anttp.del(&user, "some/path").await;
         match result {
-            Err(e) => assert_eq!(e.kind(), ErrorKind::CommandNotImplemented),
-            _ => panic!("Expected CommandNotImplemented"),
+            Err(e) => assert_ne!(e.kind(), ErrorKind::CommandNotImplemented),
+            _ => {}
         }
     }
 }
