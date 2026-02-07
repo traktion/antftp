@@ -4,6 +4,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::wrappers::TcpListenerStream;
 use suppaftp::AsyncFtpStream;
 use unftp_sbe_anttp::ServerExt;
+use serial_test::serial;
 
 // Generated from proto (provided by unftp-sbe-anttp crate)
 use unftp_sbe_anttp::proto::public_archive::public_archive_service_server::{PublicArchiveService, PublicArchiveServiceServer};
@@ -135,6 +136,7 @@ fn start_ftp_server(archive: &str, addr: &str) -> std::thread::JoinHandle<()> {
 }
 
 #[tokio::test]
+#[serial]
 async fn integration_list_and_get() {
     // 1) Start mock gRPC
     let (grpc_endpoint, _grpc_handle) = start_mock_grpc().await;
@@ -176,6 +178,7 @@ async fn integration_list_and_get() {
 }
 
 #[tokio::test]
+#[serial]
 async fn integration_put_and_mkd() {
     // 1) Start mock gRPC
     let (grpc_endpoint, _grpc_handle) = start_mock_grpc().await;
@@ -213,6 +216,7 @@ async fn integration_put_and_mkd() {
 }
 
 #[tokio::test]
+#[serial]
 async fn integration_del_and_rmd() {
     // 1) Start mock gRPC
     let (grpc_endpoint, _grpc_handle) = start_mock_grpc().await;

@@ -28,7 +28,7 @@ impl Anttp {
         let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
         let client = PublicArchiveServiceClient::new(channel);
-        let store_type = Some("memory".to_string());
+        let store_type = Some("disk".to_string());
         Ok(Anttp {
             client,
             address: Arc::new(RwLock::new(address)),
@@ -157,10 +157,10 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let len = content.len() as u64;
 
         let path_ref = path.as_ref();
-        let path_str = path_ref.to_string_lossy().into_owned();
+        let path_str = path_ref.parent().unwrap_or(Path::new("")).to_str().unwrap_or_default().to_string();
         let filename = path_ref.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let mut client = self.client.clone();
-        
+
         let mut address_guard = self.address.write().await;
         let request = tonic::Request::new(UpdatePublicArchiveRequest {
             address: address_guard.clone(),
@@ -217,7 +217,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             address: address_guard.clone(),
             files: vec![File {
                 name: ".metadata".to_string(),
-                content: Vec::new(),
+                content: "pad".as_bytes().to_vec(),
             }],
             path: Some(path_str),
             store_type: self.store_type.clone(),
