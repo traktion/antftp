@@ -2,6 +2,8 @@ pub mod proto;
 
 use crate::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
 use crate::proto::public_archive::{GetPublicArchiveRequest, UpdatePublicArchiveRequest, TruncatePublicArchiveRequest, File};
+use crate::proto::pointer::pointer_service_client::PointerServiceClient;
+use crate::proto::pointer::{UpdatePointerRequest, Pointer};
 use async_trait::async_trait;
 use libunftp::auth::UserDetail;
 use libunftp::storage::{Fileinfo, Metadata, Permissions, Result, StorageBackend, Error, ErrorKind};
@@ -19,21 +21,53 @@ pub use ext::ServerExt;
 #[derive(Debug, Clone)]
 pub struct Anttp {
     client: PublicArchiveServiceClient<Channel>,
+    pointer_client: PointerServiceClient<Channel>,
     address: Arc<RwLock<String>>,
+    pointer_name: Option<String>,
     store_type: Option<String>,
 }
 
 impl Anttp {
     pub fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Self::new_with_pointer(address, None)
+    }
+
+    pub fn new_with_pointer(address: String, pointer_name: Option<String>) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
-        let client = PublicArchiveServiceClient::new(channel);
+        let client = PublicArchiveServiceClient::new(channel.clone());
+        let pointer_client = PointerServiceClient::new(channel);
         let store_type = Some("disk".to_string());
         Ok(Anttp {
             client,
+            pointer_client,
             address: Arc::new(RwLock::new(address)),
+            pointer_name,
             store_type,
         })
+    }
+
+    async fn update_pointer(&self, new_address: String) -> Result<()> {
+        if let Some(ref pointer_name) = self.pointer_name {
+            let mut pointer_client = self.pointer_client.clone();
+            let request = tonic::Request::new(UpdatePointerRequest {
+                address: pointer_name.clone(),
+                pointer: Some(Pointer {
+                    name: Some(pointer_name.clone()),
+                    content: new_address,
+                    address: None,
+                    counter: None,
+                    cost: None,
+                }),
+                store_type: Some("disk".to_string()),
+                data_key: None,
+            });
+
+            pointer_client.update_pointer(request).await.map_err(|e| {
+                Error::new(ErrorKind::PermanentFileNotAvailable, format!("failed to update pointer: {}", e))
+            })?;
+        }
+        Ok(())
     }
 }
 
@@ -176,7 +210,12 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
 
         if let Some(new_address) = response.into_inner().address {
-            *address_guard = new_address;
+            *address_guard = new_address.clone();
+            drop(address_guard);
+            // Update pointer to point to the new archive address if configured
+            self.update_pointer(new_address).await?;
+        } else {
+            drop(address_guard);
         }
 
         Ok(len)
@@ -197,7 +236,12 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
 
         if let Some(new_address) = response.into_inner().address {
-            *address_guard = new_address;
+            *address_guard = new_address.clone();
+            drop(address_guard);
+            // Update pointer to point to the new archive address if configured
+            self.update_pointer(new_address).await?;
+        } else {
+            drop(address_guard);
         }
 
         Ok(())
@@ -227,7 +271,12 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
         
         if let Some(new_address) = response.into_inner().address {
-            *address_guard = new_address;
+            *address_guard = new_address.clone();
+            drop(address_guard);
+            // Update pointer to point to the new archive address if configured
+            self.update_pointer(new_address).await?;
+        } else {
+            drop(address_guard);
         }
 
         Ok(())
