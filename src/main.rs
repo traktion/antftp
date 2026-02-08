@@ -26,19 +26,8 @@ pub async fn main() {
 
     // If a pointer name is provided, resolve the archive address from AntTP
     if let Some(ref pointer_name) = args.pointer_name {
-        let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
-        let channel = Channel::from_shared(endpoint).expect("invalid endpoint").connect_lazy();
-        let mut client = PointerServiceClient::new(channel);
-        let req = tonic::Request::new(GetPointerRequest { address: pointer_name.clone() });
-        match client.get_pointer(req).await {
-            Ok(resp) => {
-                if let Some(pointer) = resp.into_inner().pointer {
-                    args.archive = pointer.content;
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to resolve pointer '{}': {}. Falling back to provided archive.", pointer_name, e);
-            }
+        if let Ok(archive_address) = resolve_pointer(pointer_name).await {
+            args.archive = archive_address;
         }
     }
 
@@ -54,4 +43,24 @@ pub async fn main() {
     .unwrap();
 
     server.listen(&args.listen_address).await.expect("Failed to start FTP listener");
+}
+
+async fn resolve_pointer(pointer_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
+    let channel = Channel::from_shared(endpoint)?.connect_lazy();
+    let mut client = PointerServiceClient::new(channel);
+    let req = tonic::Request::new(GetPointerRequest { address: pointer_name.to_string() });
+
+    match client.get_pointer(req).await {
+        Ok(resp) => {
+            if let Some(pointer) = resp.into_inner().pointer {
+                return Ok(pointer.content);
+            }
+            Err("Pointer not found in response".into())
+        }
+        Err(e) => {
+            eprintln!("Failed to resolve pointer '{}': {}. Falling back to provided archive.", pointer_name, e);
+            Err(e.into())
+        }
+    }
 }
