@@ -49,7 +49,7 @@ async fn resolve_pointer(pointer_name: &str) -> Result<String, Box<dyn std::erro
     let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
     let channel = Channel::from_shared(endpoint)?.connect_lazy();
     let mut client = PointerServiceClient::new(channel);
-    let req = tonic::Request::new(GetPointerRequest { address: pointer_name.to_string() });
+    let req = tonic::Request::new(GetPointerRequest { address: pointer_name.to_string(), data_key: None });
 
     match client.get_pointer(req).await {
         Ok(resp) => {
