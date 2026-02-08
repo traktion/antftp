@@ -1,0 +1,39 @@
+As an AntFTP user
+I want to provide a pointer to a public archive
+So that I when I update an archive, the pointer is updated to point its new address
+
+Given there is a pointer.proto which provides GetPointer gRPC call
+When a pointer name is provided as a CLI argument (with -p)
+Then when creating a new Anttp server instance, retrieve the public archive address from the pointer
+By calling GetPointer with address set to the pointer name provided in the CLI argument
+And use the Pointer content returned as the public archive address
+
+Given there is a pointer.proto which provides UpdatePointer gRPC call
+When a pointer name is provided as a CLI argument (with -p)
+Then when a public archive is updated, then the pointer is also updated with the archive's new address
+And use store-type = 'disk' to stage the changes in AntTP
+
+Given PUT, DEL, MKD FTP commands all update the public archive
+When one of these commands is used
+Then update the pointer content to the new public archive when these commands are executed 
+
+Given pointer name and content must be provided to update a pointer
+When updating a pointer
+Then create call UpdatePointer with a pointer with the name passed in as a CLI argument and the address returned from the updated public archive
+
+Given the clap library is used to add command line arguments
+When adding the new pointer name argument
+Then update main.rs args with pointer_name, which can be set with a long (pointer-name) or short parameter (-p)
+And when both an archive and a pointer are specified, used the pointer (and ignore the archive)
+And use archive (address) returned from GetPointer (pointer.content) instead
+
+Given testing would improve quality
+When adding pointer support
+Then update the unit tests and integration tests to reflect the ability to pass in and update a pointer
+
+Implementation Notes
+
+- Place any unit tests at the bottom of the same file as the associated production code
+- Increment patch version of anttp package in Cargo.toml
+- Create a copy of this issue description and save to /spec using the name of this issue as the filename (with lower underscore case, starting with the 5 char padded issue number, e.g. 00016_issue_title.txt)
+- Implement basic unit tests

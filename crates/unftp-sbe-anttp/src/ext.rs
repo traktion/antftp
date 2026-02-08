@@ -21,6 +21,15 @@ pub trait ServerExt {
             Anttp::new(address).expect("Cannot connect to AntTP")
         }))
     }
+
+    /// Create a new `Server` with the given AntTP address and optional pointer name.
+    fn with_anttp_pointer(address: impl Into<String>, pointer_name: Option<String>) -> ServerBuilder<Anttp, DefaultUser> {
+        let address = address.into();
+        libunftp::ServerBuilder::new(Box::new(move || {
+            let address = address.clone();
+            Anttp::new_with_pointer(address, pointer_name.clone()).expect("Cannot connect to AntTP")
+        }))
+    }
 }
 
 impl ServerExt for Server<Anttp, DefaultUser> {}
