@@ -74,6 +74,12 @@ You can use `rclone` to mount an AntTP archive as a local file system via AntFTP
 
 Now you can browse your AntTP archive as if it were a local directory.
 
+## Limitations
+
+Currently, AntFTP asks AntTP to store files to disk, rather than Autonomi network. In a future release, AntTP will
+be instructed to sync files from disk to the network. This allows many changes to be performed iteratively without
+requiring a full sync.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
