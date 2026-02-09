@@ -78,6 +78,8 @@ pub struct Meta {
     modified: Option<SystemTime>,
 }
 
+const DIRECTORY_STR: &'static str = "DIRECTORY";
+
 #[async_trait]
 impl<User: UserDetail> StorageBackend<User> for Anttp {
     type Metadata = Meta;
@@ -144,8 +146,8 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             fis.push(Fileinfo {
                 path: item_path,
                 metadata: Meta {
-                    len: item.size, 
-                    is_dir: item.r#type == "directory",
+                    len: item.size,
+                    is_dir: item.r#type.to_uppercase() == DIRECTORY_STR,
                     modified: Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(item.modified)),
                 },
             });
