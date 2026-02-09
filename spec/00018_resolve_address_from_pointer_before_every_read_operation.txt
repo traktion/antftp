@@ -1,0 +1,22 @@
+Resolve address from pointer before every read operation
+
+As an AntFTP user
+I want to resolve the pointer name to an address for each read operation
+So that if the pointer address is changed by a prior write by any user, the latest archive address will be resolved 
+
+Given any changes to an archive require the pointer content to be updated to the new public archive address
+When a read operation occurs (get, list)
+Then the pointer client should resolve the latest address for the connection
+And libunftp::Server::with_anttp_pointer is provided a PointerServiceClient instead of the resolved address
+And resolve_pointer function is moved from main.rs to lib.rs within the unftp-sbe-anttp crate
+
+Given testing would improve quality
+When adding pointer support
+Then update the unit tests and integration tests to reflect the ability to pass in and update a pointer
+
+Implementation Notes
+
+- Place any unit tests at the bottom of the same file as the associated production code
+- Increment patch version of anttp package in Cargo.toml
+- Create a copy of this issue description and save to /spec using the name of this issue as the filename (with lower underscore case, starting with the 5 char padded issue number, e.g. 00001_issue_title.txt)
+- Implement basic unit tests

@@ -2,7 +2,6 @@ use unftp_sbe_anttp::ServerExt;
 use clap::Parser;
 use tonic::transport::Channel;
 use unftp_sbe_anttp::proto::pointer::pointer_service_client::PointerServiceClient;
-use unftp_sbe_anttp::proto::pointer::GetPointerRequest;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -22,18 +21,14 @@ struct Args {
 
 #[tokio::main]
 pub async fn main() {
-    let mut args = Args::parse();
-
-    // If a pointer name is provided, resolve the archive address from AntTP
-    if let Some(ref pointer_name) = args.pointer_name {
-        if let Ok(archive_address) = resolve_pointer(pointer_name).await {
-            args.archive = archive_address;
-        }
-    }
+    let args = Args::parse();
 
     // Use the pointer-aware server builder when a pointer was specified; otherwise the default
-    let server = if args.pointer_name.is_some() {
-        libunftp::Server::with_anttp_pointer(&args.archive, args.pointer_name.clone())
+    let server = if let Some(ref pointer_name) = args.pointer_name {
+        let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
+        let channel = Channel::from_shared(endpoint).expect("Invalid endpoint").connect_lazy();
+        let pointer_client = PointerServiceClient::new(channel);
+        libunftp::Server::with_anttp_pointer(&args.archive, pointer_client, pointer_name.clone())
     } else {
         libunftp::Server::with_anttp(&args.archive)
     }
@@ -43,24 +38,4 @@ pub async fn main() {
     .unwrap();
 
     server.listen(&args.listen_address).await.expect("Failed to start FTP listener");
-}
-
-async fn resolve_pointer(pointer_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
-    let channel = Channel::from_shared(endpoint)?.connect_lazy();
-    let mut client = PointerServiceClient::new(channel);
-    let req = tonic::Request::new(GetPointerRequest { address: pointer_name.to_string(), data_key: None });
-
-    match client.get_pointer(req).await {
-        Ok(resp) => {
-            if let Some(pointer) = resp.into_inner().pointer {
-                return Ok(pointer.content);
-            }
-            Err("Pointer not found in response".into())
-        }
-        Err(e) => {
-            eprintln!("Failed to resolve pointer '{}': {}. Falling back to provided archive.", pointer_name, e);
-            Err(e.into())
-        }
-    }
 }

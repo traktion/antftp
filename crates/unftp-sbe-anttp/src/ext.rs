@@ -2,6 +2,9 @@ use crate::Anttp;
 use libunftp::auth::DefaultUser;
 use libunftp::{Server, ServerBuilder};
 
+use crate::proto::pointer::pointer_service_client::PointerServiceClient;
+use tonic::transport::Channel;
+
 /// Extension trait purely for construction convenience.
 pub trait ServerExt {
     /// Create a new `Server` with the given AntTP address.
@@ -22,12 +25,12 @@ pub trait ServerExt {
         }))
     }
 
-    /// Create a new `Server` with the given AntTP address and optional pointer name.
-    fn with_anttp_pointer(address: impl Into<String>, pointer_name: Option<String>) -> ServerBuilder<Anttp, DefaultUser> {
+    /// Create a new `Server` with the given AntTP address and pointer client.
+    fn with_anttp_pointer(address: impl Into<String>, pointer_client: PointerServiceClient<Channel>, pointer_name: String) -> ServerBuilder<Anttp, DefaultUser> {
         let address = address.into();
         libunftp::ServerBuilder::new(Box::new(move || {
             let address = address.clone();
-            Anttp::new_with_pointer(address, pointer_name.clone()).expect("Cannot connect to AntTP")
+            Anttp::new_with_pointer(address, pointer_client.clone(), pointer_name.clone()).expect("Cannot connect to AntTP")
         }))
     }
 }
