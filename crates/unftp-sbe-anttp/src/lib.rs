@@ -29,10 +29,6 @@ pub struct Anttp {
 
 impl Anttp {
     pub fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        Self::new_with_pointer(address, None)
-    }
-
-    pub fn new_with_pointer(address: String, pointer_name: Option<String>) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
         let client = PublicArchiveServiceClient::new(channel.clone());
@@ -42,9 +38,48 @@ impl Anttp {
             client,
             pointer_client,
             address: Arc::new(RwLock::new(address)),
-            pointer_name,
+            pointer_name: None,
             store_type,
         })
+    }
+
+    pub fn new_with_pointer(address: String, pointer_client: PointerServiceClient<Channel>, pointer_name: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
+        let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
+        let client = PublicArchiveServiceClient::new(channel);
+        let store_type = Some("disk".to_string());
+        Ok(Anttp {
+            client,
+            pointer_client,
+            address: Arc::new(RwLock::new(address)),
+            pointer_name: Some(pointer_name),
+            store_type,
+        })
+    }
+
+    async fn resolve_pointer(&self) -> Result<()> {
+        if let Some(ref pointer_name) = self.pointer_name {
+            let mut client = self.pointer_client.clone();
+            let req = tonic::Request::new(crate::proto::pointer::GetPointerRequest {
+                address: pointer_name.to_string(),
+                data_key: None,
+            });
+
+            match client.get_pointer(req).await {
+                Ok(resp) => {
+                    if let Some(pointer) = resp.into_inner().pointer {
+                        let mut address = self.address.write().await;
+                        *address = pointer.content;
+                        return Ok(());
+                    }
+                    return Err(Error::new(ErrorKind::PermanentFileNotAvailable, "Pointer not found in response"));
+                }
+                Err(e) => {
+                    return Err(Error::new(ErrorKind::PermanentFileNotAvailable, format!("Failed to resolve pointer '{}': {}", pointer_name, e)));
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn update_pointer(&self, new_address: String) -> Result<()> {
@@ -89,6 +124,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn metadata<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<Self::Metadata> {
+        self.resolve_pointer().await?;
         let mut path_str = path.as_ref().to_string_lossy().into_owned();
         if path_str == "." {
             path_str = "".to_string();
@@ -122,6 +158,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     where
         P: AsRef<Path> + Send + Debug,
     {
+        self.resolve_pointer().await?;
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
@@ -157,6 +194,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn get<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P, _start_pos: u64) -> Result<Box<dyn tokio::io::AsyncRead + Send + Sync + Unpin>> {
+        self.resolve_pointer().await?;
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
@@ -376,5 +414,14 @@ mod tests {
             Err(e) => assert_ne!(e.kind(), ErrorKind::CommandNotImplemented),
             _ => {}
         }
+    }
+
+    #[tokio::test]
+    async fn test_resolve_pointer_none() {
+        let addr = "some_address".to_string();
+        let anttp = Anttp::new(addr).unwrap();
+        // Should succeed immediately as there is no pointer
+        let result: Result<()> = anttp.resolve_pointer().await;
+        result.unwrap();
     }
 }
