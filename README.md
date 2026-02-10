@@ -28,6 +28,10 @@ You can run AntFTP with the following arguments:
 - `-a`, `--archive <ARCHIVE>`: The AntTP archive hash to use. (Default: `efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b`)
 - `-p`, `--pointer-name <POINTER_NAME>`: Optional pointer name to resolve the archive address from AntTP.
 - `-l`, `--listen-address <LISTEN_ADDRESS>`: The address and port the FTP server will listen on. (Default: `127.0.0.1:2121`)
+- `-n`, `--network-sync-timer <MINUTES>`: Network sync interval in minutes. Only used when a pointer is provided. (Default: `10`)
+
+### Network Syncing
+When a pointer name is provided via `-p`, AntFTP periodically synchronizes the current archive state to the Autonomi network. The sync timer (`-n`) determines how often (in minutes) AntFTP checks if the archive has changed and pushes any updates to the network. This ensures that your data is eventually persisted to the decentralized network while allowing for fast, local-first iterations.
 
 Example:
 ```bash
@@ -73,6 +77,15 @@ You can use `rclone` to mount an AntTP archive as a local file system via AntFTP
    ```
 
 Now you can browse your AntTP archive as if it were a local directory.
+
+## Logging
+AntFTP uses `env_logger` for logging. You can control the log level using the `RUST_LOG` environment variable.
+
+Example:
+```bash
+RUST_LOG=info ./antftp
+```
+To see detailed FTP command logs, use `RUST_LOG=debug`.
 
 ## Limitations
 

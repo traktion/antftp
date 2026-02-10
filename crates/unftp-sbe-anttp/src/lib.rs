@@ -11,6 +11,7 @@ use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+use log::debug;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
 use tonic::transport::Channel;
@@ -124,6 +125,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn metadata<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<Self::Metadata> {
+        debug!("FTP command: METADATA for path {:?}", path.as_ref());
         self.resolve_pointer().await?;
         let mut path_str = path.as_ref().to_string_lossy().into_owned();
         if path_str == "." {
@@ -158,6 +160,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     where
         P: AsRef<Path> + Send + Debug,
     {
+        debug!("FTP command: LIST for path {:?}", path.as_ref());
         self.resolve_pointer().await?;
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
@@ -194,6 +197,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn get<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P, _start_pos: u64) -> Result<Box<dyn tokio::io::AsyncRead + Send + Sync + Unpin>> {
+        debug!("FTP command: GET for path {:?}", path.as_ref());
         self.resolve_pointer().await?;
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
@@ -225,6 +229,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         path: P,
         _start_pos: u64,
     ) -> Result<u64> {
+        debug!("FTP command: PUT for path {:?}", path.as_ref());
         let mut content = Vec::new();
         bytes.read_to_end(&mut content).await
             .map_err(|e| Error::new(ErrorKind::LocalError, e))?;
@@ -262,6 +267,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn del<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
+        debug!("FTP command: DEL for path {:?}", path.as_ref());
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let mut address_guard = self.address.write().await;
@@ -292,6 +298,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
     }
 
     async fn mkd<P: AsRef<Path> + Send + Debug>(&self, _user: &User, path: P) -> Result<()> {
+        debug!("FTP command: MKD for path {:?}", path.as_ref());
         let path_str = path.as_ref().to_string_lossy().into_owned();
         
         let mut client = self.client.clone();
