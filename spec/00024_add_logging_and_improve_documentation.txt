@@ -1,0 +1,19 @@
+As an AntFTP user
+I want to see logs for each command that is executed and each time the data is synced to the Autonomi network
+So that it is easy to observe application behaviour
+
+Given logging is needed to explain what the application is doing
+When adding logging
+Then add 'log' dependency
+And add log output for each FTP command and for each time the archive/pointer is synced to the Autonomi network
+
+Given there are additional command line options
+When making these changes
+Then improve README.md to include the sync timer details
+And an explanation of what the sync timer does
+
+Implementation Notes
+
+- Place any unit tests at the bottom of the same file as the associated production code
+- Increment patch version of anttp package in Cargo.toml
+- Create a copy of this issue description and save to /spec using the name of this issue as the filename (with lower underscore case, starting with the 5 char padded issue number, e.g. 00001_issue_title.txt)

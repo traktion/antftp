@@ -8,6 +8,7 @@ use unftp_sbe_anttp::proto::public_archive::PushPublicArchiveRequest;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
+use log::{info, error};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -31,6 +32,7 @@ struct Args {
 
 #[tokio::main]
 pub async fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let args = Args::parse();
 
     // Use the pointer-aware server builder when a pointer was specified; otherwise the default
@@ -72,10 +74,11 @@ fn start_network_sync_job(pointer_name: String, sync_minutes: u64, endpoint: Str
                         let current_addr = ptr.content;
                         let mut last = last_synced.lock().await;
                         if last.as_ref() != Some(&current_addr) {
+                            info!("Network sync: Change detected. Pushing archive {} to network", current_addr);
                             // Push archive to network
                             let push_req = tonic::Request::new(PushPublicArchiveRequest { address: current_addr.clone(), store_type: Some("network".to_string()) });
                             if let Err(e) = archive_client_bg.push_public_archive(push_req).await {
-                                eprintln!("Network sync: failed to push archive: {}", e);
+                                error!("Network sync: failed to push archive: {}", e);
                                 continue;
                             }
                             // Update pointer on network
@@ -86,15 +89,16 @@ fn start_network_sync_job(pointer_name: String, sync_minutes: u64, endpoint: Str
                                 data_key: None,
                             });
                             if let Err(e) = pointer_client_bg.update_pointer(up_req).await {
-                                eprintln!("Network sync: failed to update pointer on network: {}", e);
+                                error!("Network sync: failed to update pointer on network: {}", e);
                                 continue;
                             }
+                            info!("Network sync: Successfully synced archive and pointer {} to network", pointer_name);
                             *last = Some(current_addr);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Network sync: failed to get pointer: {}", e);
+                    error!("Network sync: failed to get pointer: {}", e);
                 }
             }
         }
