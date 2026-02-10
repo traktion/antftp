@@ -82,7 +82,7 @@ impl Anttp {
         Ok(())
     }
 
-    async fn update_pointer(&self, new_address: String) -> Result<()> {
+    async fn update_pointer_with_store(&self, new_address: String, store_type: Option<String>) -> Result<()> {
         if let Some(ref pointer_name) = self.pointer_name {
             let mut pointer_client = self.pointer_client.clone();
             let request = tonic::Request::new(UpdatePointerRequest {
@@ -94,7 +94,7 @@ impl Anttp {
                     counter: None,
                     cost: None,
                 }),
-                store_type: Some("disk".to_string()),
+                store_type,
                 data_key: None,
             });
 
@@ -253,7 +253,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             *address_guard = new_address.clone();
             drop(address_guard);
             // Update pointer to point to the new archive address if configured
-            self.update_pointer(new_address).await?;
+            self.update_pointer_with_store(new_address, self.store_type.clone()).await?;
         } else {
             drop(address_guard);
         }
@@ -279,7 +279,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             *address_guard = new_address.clone();
             drop(address_guard);
             // Update pointer to point to the new archive address if configured
-            self.update_pointer(new_address).await?;
+            self.update_pointer_with_store(new_address, self.store_type.clone()).await?;
         } else {
             drop(address_guard);
         }
@@ -314,7 +314,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             *address_guard = new_address.clone();
             drop(address_guard);
             // Update pointer to point to the new archive address if configured
-            self.update_pointer(new_address).await?;
+            self.update_pointer_with_store(new_address, self.store_type.clone()).await?;
         } else {
             drop(address_guard);
         }

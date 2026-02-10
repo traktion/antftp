@@ -1,55 +1,50 @@
 syntax = "proto3";
-
 package public_archive;
-
 service PublicArchiveService {
   rpc CreatePublicArchive(CreatePublicArchiveRequest) returns (PublicArchiveResponse);
   rpc UpdatePublicArchive(UpdatePublicArchiveRequest) returns (PublicArchiveResponse);
   rpc TruncatePublicArchive(TruncatePublicArchiveRequest) returns (PublicArchiveResponse);
+  rpc PushPublicArchive(PushPublicArchiveRequest) returns (PublicArchiveResponse);
   rpc GetPublicArchive(GetPublicArchiveRequest) returns (GetPublicArchiveResponse);
 }
-
 message File {
   string name = 1;
   bytes content = 2;
 }
-
 message CreatePublicArchiveRequest {
   repeated File files = 1;
   optional string path = 2;
   optional string store_type = 3;
 }
-
 message UpdatePublicArchiveRequest {
   string address = 1;
   repeated File files = 2;
   optional string path = 3;
   optional string store_type = 4;
 }
-
 message TruncatePublicArchiveRequest {
   string address = 1;
   string path = 2;
   optional string store_type = 3;
 }
-
 message GetPublicArchiveRequest {
   string address = 1;
   string path = 2;
   optional string store_type = 3;
 }
-
+message PushPublicArchiveRequest {
+  string address = 1;
+  optional string store_type = 2;
+}
 message PublicArchiveResponse {
   optional string address = 1;
 }
-
 message Item {
   string name = 1;
   uint64 modified = 2;
   uint64 size = 3;
   string type = 4;
 }
-
 message GetPublicArchiveResponse {
   optional string address = 1;
   repeated Item items = 2;
