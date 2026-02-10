@@ -1,0 +1,34 @@
+Issue #22: Push changes to network on a regular schedule
+
+As an AntFTP user
+I want to push changes staged in the AntTP cache to Autonomi network
+So that they can be downloaded from the network by other users/devices 
+
+Given changes should be uploaded to the network periodically
+When new changes have been staged in the AntTP cache (store-type = disk)
+Then every X minutes, both the pointer and the archive should be pushed to the network
+And X should be set as a clap argument called network-sync-timer, with a short name of -n, with a default of 10
+And the pointer should be persisted to the network by calling update_pointer with store-type = network
+And the archive should be persisted to the network by calling PushPublicArchive with store-type = network
+And the existing functions should be refactored to accept store-type as an argument for both use cases
+
+Given public_archive.proto has been updated
+When starting to implement this feature
+Then download the latest /proto/public_archive.proto from https://raw.githubusercontent.com/traktion/AntTP/refs/heads/master/proto/public_archive.proto
+
+Given AntTP can manage the state of pointers and public archives
+When the application needs to push changes to the network
+Then the network sync code can execute from a different thread to make the code cleaner
+And the last address of the pointer should be stored after sync, so that the routine can test whether the address has changed before attempting sync the following time
+And async-job crate should be used to define the sync job in a similar way to AntTP CachingClient job here: https://github.com/traktion/AntTP/blob/master/src/client/caching_client.rs#L58
+
+Given testing would improve quality
+When adding pointer support
+Then update the unit tests and integration tests to reflect the ability to pass in and update a pointer
+
+Implementation Notes
+
+- Place any unit tests at the bottom of the same file as the associated production code
+- Increment patch version of anttp package in Cargo.toml
+- Create a copy of this issue description and save to /spec using the name of this issue as the filename (with lower underscore case, starting with the 5 char padded issue number, e.g. 00001_issue_title.txt)
+- Implement basic unit tests

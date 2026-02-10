@@ -22,6 +22,17 @@ impl PublicArchiveService for MockArchiveService {
         Err(Status::unimplemented("not needed for this test"))
     }
 
+    async fn push_public_archive(
+        &self,
+        request: Request<unftp_sbe_anttp::proto::public_archive::PushPublicArchiveRequest>,
+    ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
+        // Mock simply echoes back the same address as confirmation
+        let req = request.into_inner();
+        Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
+            address: Some(req.address),
+        }))
+    }
+
     async fn update_public_archive(
         &self,
         request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
