@@ -1,6 +1,6 @@
 # AntFTP
 
-AntFTP is an FTP server skeleton designed to bridge FTP commands to **AntTP** via gRPC and Protobuf. It allows users to access AntTP archives using standard FTP clients.
+AntFTP is an FTP server designed to bridge FTP commands to **AntTP** via gRPC and Protobuf. It allows users to access AntTP archives using standard FTP clients.
 
 ## Features
 
