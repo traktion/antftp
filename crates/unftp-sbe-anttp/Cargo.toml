@@ -2,6 +2,13 @@
 name = "unftp-sbe-anttp"
 version = "0.1.8"
 edition = "2024"
+authors = ["Paul Green"]
+description = "unFTP server library for connecting with AntTP"
+repository = "https://github.com/traktion/antftp"
+license = "Apache-2.0"
+keywords = ["anttp", "ftp", "autonomi"]
+categories = ["network-programming", "command-line-utilities"]
+exclude = [".github", ".gitignore", "target/"]
 
 [dependencies]
 async-trait = "=0.1.88"
