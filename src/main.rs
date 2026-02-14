@@ -3,8 +3,8 @@ use clap::Parser;
 use tonic::transport::Channel;
 use unftp_sbe_anttp::proto::pointer::pointer_service_client::PointerServiceClient;
 use unftp_sbe_anttp::proto::pointer::{GetPointerRequest, UpdatePointerRequest, Pointer};
-use unftp_sbe_anttp::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
-use unftp_sbe_anttp::proto::public_archive::PushPublicArchiveRequest;
+use unftp_sbe_anttp::proto::archive::archive_service_client::ArchiveServiceClient;
+use unftp_sbe_anttp::proto::archive::PushArchiveRequest;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
@@ -60,7 +60,7 @@ fn start_network_sync_job(pointer_name: String, sync_minutes: u64, endpoint: Str
     tokio::spawn(async move {
         let channel_bg = Channel::from_shared(endpoint).expect("Invalid endpoint").connect_lazy();
         let mut pointer_client_bg = PointerServiceClient::new(channel_bg.clone());
-        let mut archive_client_bg = PublicArchiveServiceClient::new(channel_bg);
+        let mut archive_client_bg = ArchiveServiceClient::new(channel_bg);
         let last_synced: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
         let mut interval = time::interval(Duration::from_secs(sync_minutes * 60));
@@ -76,8 +76,8 @@ fn start_network_sync_job(pointer_name: String, sync_minutes: u64, endpoint: Str
                         if last.as_ref() != Some(&current_addr) {
                             info!("Network sync: Change detected. Pushing archive {} to network", current_addr);
                             // Push archive to network
-                            let push_req = tonic::Request::new(PushPublicArchiveRequest { address: current_addr.clone(), store_type: Some("network".to_string()) });
-                            if let Err(e) = archive_client_bg.push_public_archive(push_req).await {
+                            let push_req = tonic::Request::new(PushArchiveRequest { address: current_addr.clone(), store_type: Some("network".to_string()) });
+                            if let Err(e) = archive_client_bg.push_archive(push_req).await {
                                 error!("Network sync: failed to push archive: {}", e);
                                 continue;
                             }
