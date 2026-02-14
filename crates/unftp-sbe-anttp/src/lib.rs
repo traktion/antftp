@@ -1,7 +1,7 @@
 pub mod proto;
 
-use crate::proto::public_archive::public_archive_service_client::PublicArchiveServiceClient;
-use crate::proto::public_archive::{GetPublicArchiveRequest, UpdatePublicArchiveRequest, TruncatePublicArchiveRequest, File};
+use crate::proto::archive::archive_service_client::ArchiveServiceClient;
+use crate::proto::archive::{GetArchiveRequest, UpdateArchiveRequest, TruncateArchiveRequest, File};
 use crate::proto::pointer::pointer_service_client::PointerServiceClient;
 use crate::proto::pointer::{UpdatePointerRequest, Pointer};
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ pub use ext::ServerExt;
 
 #[derive(Debug, Clone)]
 pub struct Anttp {
-    client: PublicArchiveServiceClient<Channel>,
+    client: ArchiveServiceClient<Channel>,
     pointer_client: PointerServiceClient<Channel>,
     address: Arc<RwLock<String>>,
     pointer_name: Option<String>,
@@ -32,7 +32,7 @@ impl Anttp {
     pub fn new(address: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
-        let client = PublicArchiveServiceClient::new(channel.clone());
+        let client = ArchiveServiceClient::new(channel.clone());
         let pointer_client = PointerServiceClient::new(channel);
         let store_type = Some("disk".to_string());
         Ok(Anttp {
@@ -47,7 +47,7 @@ impl Anttp {
     pub fn new_with_pointer(address: String, pointer_client: PointerServiceClient<Channel>, pointer_name: String) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let endpoint = std::env::var("ANTTP_GRPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:18887".to_string());
         let channel = tonic::transport::Channel::from_shared(endpoint)?.connect_lazy();
-        let client = PublicArchiveServiceClient::new(channel);
+        let client = ArchiveServiceClient::new(channel);
         let store_type = Some("disk".to_string());
         Ok(Anttp {
             client,
@@ -133,13 +133,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         }
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
-        let request = tonic::Request::new(GetPublicArchiveRequest {
+        let request = tonic::Request::new(GetArchiveRequest {
             address,
-            path: path_str,
+            path: Some(path_str),
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await.map_err(|e| {
+        let response = client.get_archive(request).await.map_err(|e| {
             if e.code() == tonic::Code::NotFound {
                 Error::from(ErrorKind::PermanentFileNotAvailable)
             } else {
@@ -165,13 +165,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
-        let request = tonic::Request::new(GetPublicArchiveRequest {
+        let request = tonic::Request::new(GetArchiveRequest {
             address,
-            path: path_str,
+            path: Some(path_str),
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await.map_err(|e| {
+        let response = client.get_archive(request).await.map_err(|e| {
             if e.code() == tonic::Code::NotFound {
                 Error::from(ErrorKind::PermanentFileNotAvailable)
             } else {
@@ -202,13 +202,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let path_str = path.as_ref().to_string_lossy().into_owned();
         let mut client = self.client.clone();
         let address = self.address.read().await.clone();
-        let request = tonic::Request::new(GetPublicArchiveRequest {
+        let request = tonic::Request::new(GetArchiveRequest {
             address,
-            path: path_str,
+            path: Some(path_str),
             store_type: self.store_type.clone(),
         });
 
-        let response = client.get_public_archive(request).await.map_err(|e| {
+        let response = client.get_archive(request).await.map_err(|e| {
             if e.code() == tonic::Code::NotFound {
                 Error::from(ErrorKind::PermanentFileNotAvailable)
             } else {
@@ -241,7 +241,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let mut client = self.client.clone();
 
         let mut address_guard = self.address.write().await;
-        let request = tonic::Request::new(UpdatePublicArchiveRequest {
+        let request = tonic::Request::new(UpdateArchiveRequest {
             address: address_guard.clone(),
             files: vec![File {
                 name: filename,
@@ -251,7 +251,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             store_type: self.store_type.clone(),
         });
 
-        let response = client.update_public_archive(request).await
+        let response = client.update_archive(request).await
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
 
         if let Some(new_address) = response.into_inner().address {
@@ -272,13 +272,13 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let mut client = self.client.clone();
         let mut address_guard = self.address.write().await;
 
-        let request = tonic::Request::new(TruncatePublicArchiveRequest {
+        let request = tonic::Request::new(TruncateArchiveRequest {
             address: address_guard.clone(),
             path: path_str,
             store_type: self.store_type.clone(),
         });
 
-        let response = client.truncate_public_archive(request).await
+        let response = client.truncate_archive(request).await
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
 
         if let Some(new_address) = response.into_inner().address {
@@ -304,7 +304,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
         let mut client = self.client.clone();
         let mut address_guard = self.address.write().await;
         
-        let request = tonic::Request::new(UpdatePublicArchiveRequest {
+        let request = tonic::Request::new(UpdateArchiveRequest {
             address: address_guard.clone(),
             files: vec![File {
                 name: ".metadata".to_string(),
@@ -314,7 +314,7 @@ impl<User: UserDetail> StorageBackend<User> for Anttp {
             store_type: self.store_type.clone(),
         });
 
-        let response = client.update_public_archive(request).await
+        let response = client.update_archive(request).await
             .map_err(|e| Error::new(ErrorKind::PermanentFileNotAvailable, e))?;
         
         if let Some(new_address) = response.into_inner().address {

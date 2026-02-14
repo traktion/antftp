@@ -5,6 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if protoc_exists {
         tonic_build::compile_protos("proto/pointer.proto")?;
         tonic_build::compile_protos("proto/pnr.proto")?;
+        tonic_build::compile_protos("proto/archive.proto")?;
         tonic_build::compile_protos("proto/public_archive.proto")?;
         tonic_build::compile_protos("proto/tarchive.proto")?;
     } else {

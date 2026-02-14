@@ -1,6 +1,6 @@
 [package]
 name = "unftp-sbe-anttp"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2024"
 authors = ["Paul Green"]
 description = "unFTP server library for connecting with AntTP"
