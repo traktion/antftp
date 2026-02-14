@@ -1,0 +1,16 @@
+As an AntFTP user
+I want to be able to interact with both public archives and tarchives by using the standard archive protobuf
+So that I don't need to implement specific tarchive support or require users to choose one source or another
+
+Given archive.proto has been added to AntTP, which can interact with both public archives and tarchives
+When adding tarchive support
+Then refactor lib.rs to use archive.proto by downloading it from https://raw.githubusercontent.com/traktion/AntTP/refs/heads/master/proto/archive.proto and adding to /proto and /crates/unftp-sbe-anttp/proto
+And update GetPublicArchiveRequest, UpdatePublicArchiveRequest, TruncatePublicArchiveRequest to use GetArchiveRequest, UpdateArchiveRequest, TruncateArchiveRequest
+And replace PublicArchiveServiceClient with ArchiveServiceClient
+And update build.rs to correctly create archive.proto structs
+
+Implementation Notes
+
+- Place any unit tests at the bottom of the same file as the associated production code
+- Increment patch version of anttp package in Cargo.toml
+- Create a copy of this issue description and save to /spec using the name of this issue as the filename (with lower underscore case, starting with the 5 char padded issue number, e.g. 00001_issue_title.txt)
