@@ -7,36 +7,38 @@ use unftp_sbe_anttp::ServerExt;
 use serial_test::serial;
 
 // Generated from proto (provided by unftp-sbe-anttp crate)
-use unftp_sbe_anttp::proto::public_archive::public_archive_service_server::{PublicArchiveService, PublicArchiveServiceServer};
-use unftp_sbe_anttp::proto::public_archive::{GetPublicArchiveRequest, GetPublicArchiveResponse, Item};
+use unftp_sbe_anttp::proto::archive::archive_service_server::{ArchiveService, ArchiveServiceServer};
+use unftp_sbe_anttp::proto::archive::{GetArchiveRequest, ArchiveResponse, Item};
 use tonic::{Request, Response, Status};
 
 struct MockArchiveService;
 
 #[tonic::async_trait]
-impl PublicArchiveService for MockArchiveService {
-    async fn create_public_archive(
+impl ArchiveService for MockArchiveService {
+    async fn create_archive(
         &self,
-        _request: Request<unftp_sbe_anttp::proto::public_archive::CreatePublicArchiveRequest>,
-    ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
+        _request: Request<unftp_sbe_anttp::proto::archive::CreateArchiveRequest>,
+    ) -> Result<Response<unftp_sbe_anttp::proto::archive::ArchiveResponse>, Status> {
         Err(Status::unimplemented("not needed for this test"))
     }
 
-    async fn push_public_archive(
+    async fn push_archive(
         &self,
-        request: Request<unftp_sbe_anttp::proto::public_archive::PushPublicArchiveRequest>,
-    ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
+        request: Request<unftp_sbe_anttp::proto::archive::PushArchiveRequest>,
+    ) -> Result<Response<unftp_sbe_anttp::proto::archive::ArchiveResponse>, Status> {
         // Mock simply echoes back the same address as confirmation
         let req = request.into_inner();
-        Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
+        Ok(Response::new(unftp_sbe_anttp::proto::archive::ArchiveResponse {
             address: Some(req.address),
+            items: vec![],
+            content: None,
         }))
     }
 
-    async fn update_public_archive(
+    async fn update_archive(
         &self,
-        request: Request<unftp_sbe_anttp::proto::public_archive::UpdatePublicArchiveRequest>,
-    ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
+        request: Request<unftp_sbe_anttp::proto::archive::UpdateArchiveRequest>,
+    ) -> Result<Response<unftp_sbe_anttp::proto::archive::ArchiveResponse>, Status> {
         let req = request.into_inner();
         
         // Basic validation of the new proto structure
@@ -54,31 +56,36 @@ impl PublicArchiveService for MockArchiveService {
 
         let mut new_address = req.address;
         new_address.push_str("_updated");
-        Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
+        Ok(Response::new(unftp_sbe_anttp::proto::archive::ArchiveResponse {
             address: Some(new_address),
+            items: vec![],
+            content: None,
         }))
     }
 
-    async fn truncate_public_archive(
+    async fn truncate_archive(
         &self,
-        request: Request<unftp_sbe_anttp::proto::public_archive::TruncatePublicArchiveRequest>,
-    ) -> Result<Response<unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse>, Status> {
+        request: Request<unftp_sbe_anttp::proto::archive::TruncateArchiveRequest>,
+    ) -> Result<Response<unftp_sbe_anttp::proto::archive::ArchiveResponse>, Status> {
         let req = request.into_inner();
         let mut new_address = req.address;
         new_address.push_str("_truncated");
-        Ok(Response::new(unftp_sbe_anttp::proto::public_archive::PublicArchiveResponse {
+        Ok(Response::new(unftp_sbe_anttp::proto::archive::ArchiveResponse {
             address: Some(new_address),
+            items: vec![],
+            content: None,
         }))
     }
 
-    async fn get_public_archive(
+    async fn get_archive(
         &self,
-        request: Request<GetPublicArchiveRequest>,
-    ) -> Result<Response<GetPublicArchiveResponse>, Status> {
+        request: Request<GetArchiveRequest>,
+    ) -> Result<Response<ArchiveResponse>, Status> {
         let req = request.into_inner();
+        let path = req.path.unwrap_or_default();
         // Root listing
-        if req.path.is_empty() || req.path == "/" || req.path == "." {
-            Ok(Response::new(GetPublicArchiveResponse {
+        if path.is_empty() || path == "/" || path == "." {
+            Ok(Response::new(ArchiveResponse {
                 address: Some(req.address.clone()),
                 items: vec![
                     Item {
@@ -96,19 +103,15 @@ impl PublicArchiveService for MockArchiveService {
                 ],
                 content: None,
             }))
-        } else if req.path == "/file1.txt" || req.path == "file1.txt" {
-            Ok(Response::new(GetPublicArchiveResponse {
+        } else if path == "/file1.txt" || path == "file1.txt" {
+            Ok(Response::new(ArchiveResponse {
                 address: Some(req.address.clone()),
                 items: vec![],
                 content: Some(b"hello world".to_vec()),
             }))
         } else {
             // Unknown path
-            Ok(Response::new(GetPublicArchiveResponse {
-                address: Some(req.address.clone()),
-                items: vec![],
-                content: None,
-            }))
+            return Err(Status::not_found("File not found"));
         }
     }
 }
@@ -119,7 +122,7 @@ async fn start_mock_grpc() -> (String, JoinHandle<()>) {
     let addr = std_listener.local_addr().unwrap();
     let incoming = TcpListenerStream::new(tokio::net::TcpListener::from_std(std_listener).unwrap());
 
-    let svc = PublicArchiveServiceServer::new(MockArchiveService);
+    let svc = ArchiveServiceServer::new(MockArchiveService);
     let handle = tokio::spawn(async move {
         tonic::transport::Server::builder()
             .add_service(svc)
