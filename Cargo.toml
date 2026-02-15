@@ -1,6 +1,6 @@
 [package]
 name = "antftp"
-version = "0.1.2"
+version = "0.1.10"
 edition = "2024"
 authors = ["Paul Green"]
 description = "AntFTP is a FTP server companion app for AntTP"

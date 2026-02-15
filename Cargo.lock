@@ -78,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "antftp"
-version = "0.1.2"
+version = "0.1.10"
 dependencies = [
  "async-std",
  "clap",
