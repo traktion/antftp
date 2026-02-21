@@ -12,10 +12,10 @@ categories = ["network-programming", "command-line-utilities"]
 exclude = [".github", ".gitignore", "target/"]
 
 [dependencies]
-libunftp = { version = "0.21.1", default-features = false }
+libunftp = { version = "0.23.0", default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "tls12", "std"] }
 tokio = { version = "1", features = ["full"] }
-unftp-sbe-anttp = { version = "0.1.0", path = "crates/unftp-sbe-anttp" }
+unftp-sbe-anttp = { version = "0.1.1", path = "crates/unftp-sbe-anttp" }
 tonic = { version = "0.12", features = ["router"] }
 prost = { version = "0.13"}
 clap = { version = "4.5.57", features = ["derive"] }

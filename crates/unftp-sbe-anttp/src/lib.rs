@@ -5,8 +5,8 @@ use crate::proto::archive::{GetArchiveRequest, UpdateArchiveRequest, TruncateArc
 use crate::proto::pointer::pointer_service_client::PointerServiceClient;
 use crate::proto::pointer::{UpdatePointerRequest, Pointer};
 use async_trait::async_trait;
-use libunftp::auth::UserDetail;
-use libunftp::storage::{Fileinfo, Metadata, Permissions, Result, StorageBackend, Error, ErrorKind};
+use unftp_core::auth::UserDetail;
+use unftp_core::storage::{Fileinfo, Metadata, Permissions, Result, StorageBackend, Error, ErrorKind};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
