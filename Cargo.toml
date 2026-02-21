@@ -14,7 +14,7 @@ exclude = [".github", ".gitignore", "target/"]
 [dependencies]
 libunftp = { version = "0.23.0", default-features = false }
 tokio = { version = "1", features = ["full"] }
-unftp-sbe-anttp = { version = "0.1.1", path = "crates/unftp-sbe-anttp" }
+unftp-sbe-anttp = { version = "0.1.11", path = "crates/unftp-sbe-anttp" }
 tonic = { version = "0.12", features = ["router"] }
 clap = { version = "4.5.57", features = ["derive"] }
 log = "0.4"
