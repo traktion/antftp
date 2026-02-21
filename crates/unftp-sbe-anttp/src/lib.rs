@@ -412,7 +412,7 @@ mod tests {
     async fn test_del_implemented() {
         let addr = "efdcdc93db39d5ffef254f9bb3e069fc6315a1054f20a8b00343629f7773663b".to_string();
         let anttp = Anttp::new(addr).unwrap();
-        let user = libunftp::auth::DefaultUser {};
+        let user = unftp_core::auth::DefaultUser {};
         // This will try to connect to the real server (or fail if it's not running)
         // Since we don't have a mock server in unit tests, it's likely to return an error.
         // But the error should be from gRPC, not CommandNotImplemented.

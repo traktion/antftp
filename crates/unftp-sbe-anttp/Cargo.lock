@@ -1972,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "unftp-sbe-anttp"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "async-trait",
  "cap-std",

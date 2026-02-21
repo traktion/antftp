@@ -1,9 +1,9 @@
 use crate::Anttp;
-use libunftp::auth::DefaultUser;
 use libunftp::{Server, ServerBuilder};
 
 use crate::proto::pointer::pointer_service_client::PointerServiceClient;
 use tonic::transport::Channel;
+use unftp_core::auth::DefaultUser;
 
 /// Extension trait purely for construction convenience.
 pub trait ServerExt {

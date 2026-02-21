@@ -1,4 +1,3 @@
-use unftp_sbe_anttp::ServerExt;
 use clap::Parser;
 use tonic::transport::Channel;
 use unftp_sbe_anttp::proto::pointer::pointer_service_client::PointerServiceClient;
@@ -9,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 use log::{info, error};
+use unftp_sbe_anttp::ServerExt;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

@@ -78,15 +78,13 @@ dependencies = [
 
 [[package]]
 name = "antftp"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "async-std",
  "clap",
  "env_logger",
  "libunftp",
  "log",
- "prost",
- "rustls",
  "serial_test",
  "suppaftp",
  "tokio",
@@ -1879,7 +1877,6 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
- "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
@@ -2448,7 +2445,7 @@ dependencies = [
 
 [[package]]
 name = "unftp-sbe-anttp"
-version = "0.1.1"
+version = "0.1.11"
 dependencies = [
  "async-trait",
  "cap-std",
